@@ -13,7 +13,7 @@ allowed-tools:
 
 - **严禁使用 `web_search` / `web_fetch` 获取任何数据** — 搜索引擎结果无法替代结构化量化数据
 - **所有数据通过 `stock-data-crawl` API + Python 脚本获取**，所有分析通过脚本计算
-- **严禁读取 `.py` 脚本源码** — 直接执行，不需要理解内部逻辑
+- **正常流程不读取 `.py` 脚本源码** — 直接执行，不需要理解内部逻辑。若脚本返回异常(如 0 结果、非预期错误)可读取脚本确认输入/输出格式
 - **只能用 bash 工具依次执行下面的命令**，如果 bash 不可用则告知用户并停止，不要退化为搜索
 
 ## Overview
@@ -39,6 +39,12 @@ stock-data-crawl (数据+筛选)            deer-flow Skill (分析+信号)
 
 - **stock-data-crawl 服务必须运行中**，API 地址通过 `STOCK_API_BASE_URL` 环境变量配置（在项目 `.env` 文件中设置），脚本会自动读取
 - Python 3 需在 sandbox 内可用
+- **Python 依赖**: `numpy` 必须可用。在每个 scenario 的 Step 1 中用以下命令验证：
+
+```bash
+python -c "import numpy; print('numpy ok')"
+python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
+```
 
 ## Workflow
 
@@ -59,15 +65,20 @@ stock-data-crawl (数据+筛选)            deer-flow Skill (分析+信号)
 
 当用户指定了一只或多只股票代码/名称时，跳过全市场筛选，直接拉 K 线做技术分析。
 
-#### Step A1: 验证 bash 工具
+#### Step A1: 验证环境
 
-先确认 bash 工具可用（这是唯一可用的数据获取方式，不要使用 web_search/web_fetch）：
+先确认 bash 工具、Python、numpy 依赖和 API 服务均可正常使用（不要使用 web_search/web_fetch）：
 
 ```bash
 echo "bash tool ready"
+python -c "import numpy; print('numpy ok')"
+python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
 ```
 
-如果此命令执行失败，告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止。
+如果任何命令执行失败：
+- bash 失败 → 告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止
+- numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
+- API 失败 → 告知用户 **"stock-data-crawl 服务未启动"**，请检查 `STOCK_API_BASE_URL` 环境变量
 
 #### Step A2: 获取 K 线数据
 
@@ -83,11 +94,26 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 #### Step A3: 计算技术指标
 
+> `indicators.py` 最多返回 120 条 K 线对应的技术指标。如输出为空 `{}`，见 Error Handling 章节排查。
+
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
   --klines /mnt/user-data/workspace/klines.json \
   --output /mnt/user-data/workspace/indicators.json
 ```
+
+#### Step A3.5 (可选): 获取新闻舆情
+
+如需补充新闻舆情辅助判断, 可执行:
+
+```bash
+python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
+  --action news \
+  --query "股票代码 股票名称 最新消息" \
+  --output /mnt/user-data/workspace/news.json
+```
+
+此步骤不是必需, 仅当用户明确要求基本面分析或舆情时才执行。如脚本执行失败(API Key 未配置), 跳过此步骤不影响主流程。
 
 #### Step A4: 呈现技术分析结果
 
@@ -115,12 +141,14 @@ KDJ: K=XX D=XX J=XX
 
 > **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。本场景全程不允许使用 web_search 或 web_fetch。
 
-#### Step B1: 验证 bash 工具
+#### Step B1: 验证环境
 
-先确认 bash 工具可用（这是唯一可用的数据获取方式，不要使用 web_search/web_fetch）：
+先确认 bash 工具、Python、numpy 依赖和 API 服务均可正常使用（不要使用 web_search/web_fetch）：
 
 ```bash
 echo "bash tool ready"
+python -c "import numpy; print('numpy ok')"
+python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
 ```
 
 #### Step B2: 多因子筛选
@@ -209,10 +237,33 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 2. **禁止退化为 web_search / web_fetch** — 搜索新闻无法替代结构化量化数据，不要尝试用搜索填补数据缺失
 3. 如果单个步骤失败，输出已成功步骤的结果并标注失败步骤，然后停止
 
+### 脚本返回 0 结果或空 JSON
+
+若脚本 bash 退出码为 0 但结果为空(如 `indicators.py` 输出空 `{}`)：
+
+1. 这通常是输入数据格式不匹配导致。`fetch_data.py` 输出是分组格式 `[{code, klines: [...]}]`，确认 klines.json 第一层元素有 `klines` 字段
+2. 可读取脚本源码(`indicators.py` 的 `compute_all_indicators` 函数)查看期望格式，对比实际 JSON 排查差异
+3. 修复后重新运行失败步骤
+
+### 股票名称为空
+
+若输出中股票名称显示为 `None`：
+
+1. 尝试调用 API 获取名称：
+   ```bash
+   python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
+     --action stocks --market all \
+     --output /mnt/user-data/workspace/stock_names.json
+   ```
+2. 读取 `/mnt/user-data/workspace/stock_names.json`，从 `security_name` 字段查找对应代码的名称
+3. 或在最终呈现时代码只输出代码，不显示名称
+
 ## Notes
 
 - 脚本间有依赖关系，前一步成功后才能执行下一步
 - 数据量大时（全市场 50 只股票 × 250 天 K 线），单次执行可能需要 30-60 秒
+- 股票名称会自动从行情数据补全；若仍为空，见 Error Handling → 股票名称为空
+- 单股 K 线支持通过 `--days` 参数控制返回天数（默认 250，最快在 500 条以内）
 
 ## References
 

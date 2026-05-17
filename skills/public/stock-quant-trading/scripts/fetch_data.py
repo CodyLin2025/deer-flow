@@ -58,7 +58,7 @@ def fetch_screened_stocks(api_base: str = API_BASE, market: str = "all", top_n: 
 
 
 def fetch_klines(api_base: str = API_BASE, stock_code: str = "", days: int = 250) -> dict:
-    url = f"{api_base}/kline/{stock_code}"
+    url = f"{api_base}/kline/{stock_code}?limit={days}"
     return _get(url)
 
 
@@ -103,9 +103,12 @@ def main():
         codes = [c.strip() for c in args.codes.split(",") if c.strip()]
         if len(codes) == 1:
             result = fetch_klines(args.api_base, codes[0], args.days)
+            stocks = result.get("data", result)
+            if isinstance(stocks, list) and stocks and "klines" not in stocks[0]:
+                stocks = [{"security_code": codes[0], "klines": stocks}]
         else:
             result = fetch_klines_batch(args.api_base, codes, args.days)
-        stocks = result.get("data", result)
+            stocks = result.get("data", result)
     elif args.action == "stocks":
         result = fetch_stock_list(args.api_base, args.market)
         stocks = result.get("data", [])
