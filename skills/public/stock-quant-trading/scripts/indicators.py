@@ -178,6 +178,7 @@ def calc_historical_volatility(closes: list[float], period: int = 60) -> float |
 
 
 def compute_indicators(klines_data: list[dict]) -> dict:
+    klines_data = list(reversed(klines_data))
     closes = [k["close"] for k in klines_data if k.get("close") is not None]
     highs = [k["high"] for k in klines_data if k.get("high") is not None]
     lows = [k["low"] for k in klines_data if k.get("low") is not None]

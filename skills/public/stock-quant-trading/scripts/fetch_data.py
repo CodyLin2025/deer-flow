@@ -82,9 +82,24 @@ def fetch_stock_list(api_base: str = API_BASE, market: str = "all") -> dict:
     return _get(url)
 
 
+def fetch_quote(api_base: str = API_BASE, stock_code: str = "") -> dict:
+    url = f"{api_base}/quote/{stock_code}"
+    return _get(url)
+
+
+def fetch_finance(api_base: str = API_BASE, stock_code: str = "") -> dict:
+    url = f"{api_base}/finance/{stock_code}"
+    return _get(url)
+
+
+def fetch_report(api_base: str = API_BASE, stock_code: str = "") -> dict:
+    url = f"{api_base}/report/{stock_code}"
+    return _get(url)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Stock Data Fetcher")
-    parser.add_argument("--action", required=True, choices=["screener", "klines", "stocks", "news"])
+    parser.add_argument("--action", required=True, choices=["screener", "klines", "stocks", "news", "quote", "finance", "report"])
     parser.add_argument("--api-base", default=API_BASE)
     parser.add_argument("--codes", default="")
     parser.add_argument("--code", default="")
@@ -114,6 +129,18 @@ def main():
         stocks = result.get("data", [])
     elif args.action == "news":
         result = fetch_news(args.api_base, args.query)
+        stocks = result.get("data", result)
+    elif args.action == "quote":
+        code = args.code or args.codes.split(",")[0].strip()
+        result = fetch_quote(args.api_base, code)
+        stocks = result.get("data", result)
+    elif args.action == "finance":
+        code = args.code or args.codes.split(",")[0].strip()
+        result = fetch_finance(args.api_base, code)
+        stocks = result.get("data", result)
+    elif args.action == "report":
+        code = args.code or args.codes.split(",")[0].strip()
+        result = fetch_report(args.api_base, code)
         stocks = result.get("data", result)
 
     output = args.output

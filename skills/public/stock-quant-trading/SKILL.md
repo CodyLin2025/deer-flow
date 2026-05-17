@@ -63,7 +63,9 @@ python -c "import urllib.request; resp = urllib.request.urlopen('http://localhos
 
 > **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。本场景全程不允许使用 web_search 或 web_fetch。
 
-当用户指定了一只或多只股票代码/名称时，跳过全市场筛选，直接拉 K 线做技术分析。
+当用户指定了一只或多只股票代码/名称时，进行完整的 **行情 + 技术 + 财务 + 研报 + 舆情** 多维度分析。
+
+> **K 线数据排序说明**: stock-data-crawl API 的 `/api/kline/{code}` 和 `/api/kline/batch` 按 `trade_date` **倒序**返回(最新在前)。`indicators.py` 内部已自动反转为正序(最旧在前)再计算，调用方无需额外处理。
 
 #### Step A1: 验证环境
 
@@ -80,21 +82,50 @@ python -c "import urllib.request; resp = urllib.request.urlopen('http://localhos
 - numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
 - API 失败 → 告知用户 **"stock-data-crawl 服务未启动"**，请检查 `STOCK_API_BASE_URL` 环境变量
 
-#### Step A2: 获取 K 线数据
+#### Step A2: 获取实时行情
 
-将用户提供的股票代码（如 `603345`）直接传入 `--codes` 参数：
+```bash
+python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
+  --action quote \
+  --code "600276" \
+  --output /mnt/user-data/workspace/quote.json
+```
+
+返回字段: `latest_price`, `change_pct`, `change_amount`, `pe_dynamic`, `pe_ttm`, `pb`, `total_market_cap`, `circulating_market_cap`, `volume`, `turnover`, `turnover_rate`, `amplitude`, `open`, `high`, `low`, `prev_close`, `volume_ratio`, `main_net_inflow`, `change_60d`, `change_ytd`, `trade_time`
+
+#### Step A3: 获取财务数据
+
+```bash
+python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
+  --action finance \
+  --code "600276" \
+  --output /mnt/user-data/workspace/finance.json
+```
+
+返回字段: `report_date`, `report_type`, `eps_basic`, `bps`, `cash_flow_ps`, `total_operate_revenue`, `parent_net_profit`, `deducted_net_profit`, `revenue_yoy`, `net_profit_yoy`, `deducted_profit_yoy`, `roe`, `roa`, `roic`, `net_profit_margin`, `gross_margin`, `current_ratio`, `asset_liability_ratio`, `ocf_to_revenue`, `interest_coverage_ratio`, `fcff_forward`, `eps_yoy`, `roe_yoy`
+
+#### Step A4: 获取研报数据
+
+```bash
+python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
+  --action report \
+  --code "600276" \
+  --output /mnt/user-data/workspace/report.json
+```
+
+返回近 180 天最多 20 条研报: `title`, `org_name`, `em_rating_name`, `rating_change`, `publisher_date`, `researcher`, `predict_this_year_eps`, `predict_this_year_pe`, `predict_next_year_eps`, `predict_next_year_pe`, `predict_next_two_year_eps`, `predict_next_two_year_pe`
+
+#### Step A5: 获取 K 线数据
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --action klines \
-  --codes "股票代码1,股票代码2,..." \
+  --codes "600276" \
   --days 250 \
   --output /mnt/user-data/workspace/klines.json
 ```
 
-#### Step A3: 计算技术指标
-
-> `indicators.py` 最多返回 120 条 K 线对应的技术指标。如输出为空 `{}`，见 Error Handling 章节排查。
+#### Step A6: 计算技术指标
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
@@ -102,38 +133,84 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
   --output /mnt/user-data/workspace/indicators.json
 ```
 
-#### Step A3.5 (可选): 获取新闻舆情
-
-如需补充新闻舆情辅助判断, 可执行:
+#### Step A7: 获取新闻舆情
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --action news \
-  --query "股票代码 股票名称 最新消息" \
+  --query "恒瑞医药 600276 最新消息" \
   --output /mnt/user-data/workspace/news.json
 ```
 
-此步骤不是必需, 仅当用户明确要求基本面分析或舆情时才执行。如脚本执行失败(API Key 未配置), 跳过此步骤不影响主流程。
+如 API Key 未配置导致失败，跳过此步骤，在报告中标注"舆情数据暂缺"。
 
-#### Step A4: 呈现技术分析结果
+#### Step A8: 呈现综合分析报告
 
-用 `read_file` 读取 `/mnt/user-data/workspace/indicators.json`，按以下格式输出：
+依次用 `read_file` 读取所有 JSON 结果，按以下 6 个维度输出综合报告：
 
-```
-股票: [代码] [名称]
-───────────────────────────────────
-最新价: XX | MA5: XX | MA20: XX | MA60: XX
-MACD: DIF=XX DEA=XX 柱=XX (金叉/死叉)
-RSI-14: XX (超买/中性/超卖)
-KDJ: K=XX D=XX J=XX
-布林带: 上轨=XX 中轨=XX 下轨=XX
+---
 
-技术面判断:
-- 均线: 多头/空头排列
-- MACD: 金叉/死叉/粘合
-- RSI: 超买/超卖/中性
-- 布林带: 价格在通道上/中/下轨
-```
+**1. 实时行情**
+
+| 指标 | 数值 |
+|------|------|
+| 最新价 | XX (涨跌幅 ±XX%) |
+| 市盈率 (TTM) / 动态PE | XX / XX |
+| 市净率 PB | XX |
+| 总市值 / 流通市值 | XX亿 / XX亿 |
+| 换手率 / 量比 | XX% / XX |
+| 资金流向 (主力净流入) | XX |
+| 60日涨跌幅 / 年初至今 | XX% / XX% |
+
+**2. 技术分析**
+
+| 指标 | 数值 | 判断 |
+|------|------|------|
+| 均线系统 | MA5/MA10/MA20/MA60 | 多头/空头排列 |
+| MACD | DIF/DEA/柱 | 金叉/死叉 |
+| RSI-14 | XX | 超买/中性/超卖 |
+| KDJ | K/D/J | 状态描述 |
+| 布林带 | 上/中/下轨 | 价格位置 |
+
+**3. 财务分析**
+
+| 指标 | 数值 | 评价 |
+|------|------|------|
+| 报告期 | XX | - |
+| EPS / BPS | XX / XX | - |
+| 营收 / 营收增速 YoY | XX亿 / ±XX% | - |
+| 归母净利润 / 增速 YoY | XX亿 / ±XX% | - |
+| ROE / ROA / ROIC | XX% / XX% / XX% | - |
+| 毛利率 / 净利率 | XX% / XX% | - |
+| 资产负债率 | XX% | - |
+| 经营现金流 / 营收 | XX | - |
+| 自由现金流 (前瞻) | XX | - |
+
+**4. 研报分析**
+
+| 维度 | 内容 |
+|------|------|
+| 近 180 天研报数 | N 份 |
+| 评级分布 | 买入:N 增持:N 中性:N 减持:N |
+| 评级变化趋势 | 上调:N 维持:N 下调:N |
+| EPS 一致预测 (今/明/后年) | XX / XX / XX |
+| 对应 PE (今/明/后年) | XX / XX / XX |
+| 主要机构 | XX, XX, XX... |
+
+**5. 舆情分析**
+
+列出近期相关新闻摘要（如有），标注正/中/负面倾向。
+
+**6. 综合研判**
+
+融合以上 5 个维度，给出投资价值判断：
+- **行情面**: 估值水平(PE/PB 分位)、资金动向
+- **技术面**: 趋势方向、关键支撑/压力位
+- **财务面**: 盈利能力、成长性、财务健康度
+- **研报面**: 分析师共识方向
+- **舆情面**: 近期事件催化剂/风险
+
+> **免责声明**: 以上分析基于公开数据，不构成投资建议。股市有风险，投资需谨慎。
 
 ---
 
