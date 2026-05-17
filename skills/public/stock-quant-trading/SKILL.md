@@ -43,7 +43,6 @@ stock-data-crawl (数据+筛选)            deer-flow Skill (分析+信号)
 
 ```bash
 python -c "import numpy; print('numpy ok')"
-python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
 ```
 
 ## Workflow
@@ -69,18 +68,16 @@ python -c "import urllib.request; resp = urllib.request.urlopen('http://localhos
 
 #### Step A1: 验证环境
 
-先确认 bash 工具、Python、numpy 依赖和 API 服务均可正常使用（不要使用 web_search/web_fetch）：
+先确认 bash 工具、Python、numpy 依赖可正常使用（不要使用 web_search/web_fetch）：
 
 ```bash
 echo "bash tool ready"
 python -c "import numpy; print('numpy ok')"
-python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
 ```
 
 如果任何命令执行失败：
 - bash 失败 → 告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止
 - numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
-- API 失败 → 告知用户 **"stock-data-crawl 服务未启动"**，请检查 `STOCK_API_BASE_URL` 环境变量
 
 #### Step A2: 获取实时行情
 
@@ -220,13 +217,16 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 #### Step B1: 验证环境
 
-先确认 bash 工具、Python、numpy 依赖和 API 服务均可正常使用（不要使用 web_search/web_fetch）：
+先确认 bash 工具、Python、numpy 依赖可正常使用（不要使用 web_search/web_fetch）：
 
 ```bash
 echo "bash tool ready"
 python -c "import numpy; print('numpy ok')"
-python -c "import urllib.request; resp = urllib.request.urlopen('http://localhost:8000/api/stocks/list?limit=1', timeout=5); print('API ok')"
 ```
+
+如果任何命令执行失败：
+- bash 失败 → 告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止
+- numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
 
 #### Step B2: 多因子筛选
 
