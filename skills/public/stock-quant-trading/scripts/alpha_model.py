@@ -110,8 +110,8 @@ class AlphaModel:
         }
 
 
-def run_alpha_model(screened_list: list[dict], indicators: dict[str, dict]) -> list[dict]:
-    model = AlphaModel()
+def run_alpha_model(screened_list: list[dict], indicators: dict[str, dict], weights: dict[str, float] | None = None) -> list[dict]:
+    model = AlphaModel(weights=weights)
     results = []
     for s in screened_list:
         result = model.compute(s, indicators)
@@ -124,6 +124,7 @@ def main():
     parser = argparse.ArgumentParser(description="Alpha Model")
     parser.add_argument("--screened", required=True, help="Screened stocks JSON")
     parser.add_argument("--indicators", required=True, help="Indicators JSON")
+    parser.add_argument("--weights", required=False, default=None, help="Regime weights JSON (optional, overrides defaults)")
     parser.add_argument("--output", required=True, help="Output signals JSON")
     args = parser.parse_args()
 
@@ -133,7 +134,15 @@ def main():
     with open(args.indicators) as f:
         indicators = json.load(f)
 
-    results = run_alpha_model(screened_list, indicators)
+    weights = None
+    if args.weights:
+        try:
+            with open(args.weights) as f:
+                weights = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    results = run_alpha_model(screened_list, indicators, weights=weights)
 
     with open(args.output, "w") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
