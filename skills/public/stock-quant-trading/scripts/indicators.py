@@ -46,11 +46,15 @@ def calc_macd(closes: list[float], fast: int = 12, slow: int = 26, signal: int =
     clean_dif = [d for d in dif if d is not None]
     dea = [None] * len(closes)
     if len(clean_dif) >= signal:
+        dea_start = slow - 1
         for i in range(len(dif)):
-            if i >= slow + signal - 2 and dif[i] is not None:
+            if i == dea_start + signal - 1:
                 back = [d for d in dif[max(0, i - signal + 1):i + 1] if d is not None]
                 if back:
                     dea[i] = sum(back) / len(back)
+            elif i > dea_start + signal - 1:
+                if dif[i] is not None and dea[i - 1] is not None:
+                    dea[i] = (dif[i] - dea[i - 1]) * (2.0 / (signal + 1)) + dea[i - 1]
 
     histogram: list[float | None] = [None] * len(closes)
     for i in range(len(closes)):

@@ -77,6 +77,7 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str) -> 
 
 
 def phase2_diversify(positions: list[dict]) -> list[dict]:
+    original = [p["position"] for p in positions]
     result = list(positions)
 
     sector_totals: dict[str, float] = {}
@@ -84,12 +85,10 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
         ind = p.get("industry", "其他") or "其他"
         sector_totals[ind] = sector_totals.get(ind, 0) + p["position"]
 
-    for p in result:
-        ind = p.get("industry", "其他") or "其他"
-        over = sector_totals.get(ind, 0) - 0.25
-        if over > 0:
-            scale = min(1.0, 0.25 / sector_totals[ind])
-            p["position"] = round(p["position"] * scale, 4)
+    sector_scales: dict[str, float] = {}
+    for ind, total in sector_totals.items():
+        if total > 0.25:
+            sector_scales[ind] = 0.25 / total
 
     theme_totals: dict[str, float] = {"tech": 0, "consume": 0}
     for p in result:
@@ -99,14 +98,11 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
         if ind in CONSUME_THEME:
             theme_totals["consume"] += p["position"]
 
+    theme_scales: dict[str, float] = {}
     for theme, limit in [("tech", 0.50), ("consume", 0.50)]:
         total = theme_totals[theme]
         if total > limit:
-            scale = limit / total
-            for p in result:
-                ind = p.get("industry", "其他") or "其他"
-                if (theme == "tech" and ind in TECH_THEME) or (theme == "consume" and ind in CONSUME_THEME):
-                    p["position"] = round(p["position"] * scale, 4)
+            theme_scales[theme] = limit / total
 
     benchmark_totals: dict[str, float] = {}
     index_limits = {"000300": 0.40, "000852": 0.40, "399006": 0.30, "000688": 0.25}
@@ -114,25 +110,39 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
         bm = p.get("benchmark", "") or "000852"
         benchmark_totals[bm] = benchmark_totals.get(bm, 0) + p["position"]
 
+    benchmark_scales: dict[str, float] = {}
     for bm, total in benchmark_totals.items():
         limit = index_limits.get(bm, 0.40)
         if total > limit:
-            scale = limit / total
-            for p in result:
-                if (p.get("benchmark", "") or "000852") == bm:
-                    p["position"] = round(p["position"] * scale, 4)
+            benchmark_scales[bm] = limit / total
 
-    sector_benchmark: dict[tuple, list] = {}
-    for i, p in enumerate(result):
+    sector_benchmark_count: dict[tuple, int] = {}
+    for p in result:
         key = (p.get("industry", "其他") or "其他", p.get("benchmark", "") or "000852")
-        if key not in sector_benchmark:
-            sector_benchmark[key] = []
-        sector_benchmark[key].append(i)
+        sector_benchmark_count[key] = sector_benchmark_count.get(key, 0) + 1
 
-    for indices in sector_benchmark.values():
-        if len(indices) > 2:
-            for idx in indices[2:]:
-                result[idx]["position"] = round(result[idx]["position"] * 0.7, 4)
+    for i, p in enumerate(result):
+        ind = p.get("industry", "其他") or "其他"
+        bm = p.get("benchmark", "") or "000852"
+        sb_key = (ind, bm)
+
+        scales: list[float] = [1.0]
+        if ind in sector_scales:
+            scales.append(sector_scales[ind])
+        if ind in TECH_THEME and "tech" in theme_scales:
+            scales.append(theme_scales["tech"])
+        if ind in CONSUME_THEME and "consume" in theme_scales:
+            scales.append(theme_scales["consume"])
+        if bm in benchmark_scales:
+            scales.append(benchmark_scales[bm])
+        if sector_benchmark_count.get(sb_key, 0) > 2:
+            sb_index = sum(1 for j in range(i) if (result[j].get("industry", "其他") or "其他", result[j].get("benchmark", "") or "000852") == sb_key)
+            if sb_index >= 2:
+                scales.append(0.7)
+
+        final_scale = min(scales)
+        if final_scale < 1.0:
+            p["position"] = round(original[i] * final_scale, 4)
 
     return result
 
