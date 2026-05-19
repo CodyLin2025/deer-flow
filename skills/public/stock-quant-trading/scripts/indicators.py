@@ -203,6 +203,8 @@ def compute_indicators(klines_data: list[dict]) -> dict:
     return {
         "latest": {
             "close": closes[-1] if closes else None,
+            "high_60d": max(highs[-60:]) if len(highs) >= 60 else (max(highs) if highs else None),
+            "low_60d": min(lows[-60:]) if len(lows) >= 60 else (min(lows) if lows else None),
             "ma5": ma5[-1],
             "ma10": ma10[-1],
             "ma20": ma20[-1],
