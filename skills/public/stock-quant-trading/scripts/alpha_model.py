@@ -105,6 +105,8 @@ class AlphaModel:
             "signal": signal,
             "confidence": round(confidence, 2),
             "risk_flags": risk_flags,
+            "total_market_cap": screened.get("total_market_cap"),
+            "vol_60d": screened.get("vol_60d"),
         }
 
 
