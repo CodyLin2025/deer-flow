@@ -2,8 +2,10 @@
 """
 Multi-Factor Alpha Model (deer-flow端)
 
-Fuses screener factor scores + technical indicators + news sentiment
+Fuses screener factor scores with risk flag adjustments
 to produce final alpha scores and buy/sell signals.
+Technical indicators are NOT part of the alpha model —
+they are used independently in single-stock analysis (Scenario A).
 
 Usage:
     python alpha_model.py --screened data/screened.json --indicators data/indicators.json --output data/signals.json
@@ -55,47 +57,6 @@ def calc_factor_dispersion(factor_scores: dict[str, float]) -> float:
     return variance ** 0.5
 
 
-def calc_technical_adjustment(indicators: dict, screener_alpha: float) -> float:
-    if not indicators:
-        return 0
-
-    latest = indicators.get("latest", {})
-    adjustment = 0.0
-
-    rsi = latest.get("rsi_14")
-    if rsi is not None:
-        if rsi < 30:
-            adjustment += 3
-        elif rsi > 70:
-            adjustment -= 3
-
-    close = latest.get("close")
-    ma20 = latest.get("ma20")
-    ma60 = latest.get("ma60")
-    if close and ma20 and ma60:
-        if close > ma60 and close > ma20:
-            adjustment += 2
-        elif close < ma60 and close < ma20:
-            adjustment -= 2
-
-    macd_dif = latest.get("macd_dif")
-    macd_dea = latest.get("macd_dea")
-    if macd_dif is not None and macd_dea is not None:
-        if macd_dif > macd_dea:
-            adjustment += 2
-        else:
-            adjustment -= 2
-
-    kdj_j = latest.get("kdj_j")
-    if kdj_j is not None:
-        if kdj_j < 0:
-            adjustment += 3
-        elif kdj_j > 100:
-            adjustment -= 3
-
-    return adjustment
-
-
 class AlphaModel:
     DEFAULT_WEIGHTS = {
         "value": 0.125,
@@ -104,9 +65,8 @@ class AlphaModel:
         "momentum": 0.125,
         "low_vol": 0.125,
         "sentiment": 0.125,
-        "size": 0.125,
         "industry": 0.125,
-        "technical": 0.1,
+        "relative_strength": 0.125,
     }
 
     def __init__(self, weights: dict[str, float] | None = None):
@@ -114,19 +74,14 @@ class AlphaModel:
 
     def compute(self, screened: dict, indicators: dict[str, dict]) -> dict:
         factor_scores = screened.get("factor_scores", {})
-        fund_alpha = screened.get("alpha_score", 60.0)
         code = screened.get("code", "")
-
-        ind_data = indicators.get(code, {})
-        tech_adj = calc_technical_adjustment(ind_data, fund_alpha)
 
         factor_sum = sum(
             self.weights.get(k, 0.125) * v
             for k, v in factor_scores.items()
-        ) * 0.9
+        )
 
-        final_alpha = factor_sum + tech_adj * 0.1
-        final_alpha = max(0, min(100, final_alpha))
+        final_alpha = max(0, min(100, factor_sum))
 
         dispersion = calc_factor_dispersion(factor_scores)
         signal, confidence = determine_signal(final_alpha, dispersion)
@@ -144,9 +99,9 @@ class AlphaModel:
             "name": screened.get("name", ""),
             "market": screened.get("market", ""),
             "industry": screened.get("industry", ""),
+            "benchmark": screened.get("benchmark_code", ""),
             "alpha_score": round(final_alpha, 2),
             "factor_scores": factor_scores,
-            "technical_adjustment": round(tech_adj, 2),
             "signal": signal,
             "confidence": round(confidence, 2),
             "risk_flags": risk_flags,

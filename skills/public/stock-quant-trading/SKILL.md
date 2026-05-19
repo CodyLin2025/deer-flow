@@ -30,8 +30,8 @@ stock-data-crawl (数据+筛选)            deer-flow Skill (分析+信号)
 │ POST /api/search/web   │ ──→      │ fetch_data.py                     │
 └────────────────────────┘           │                                    │
                                      │ indicators.py (MA/MACD/RSI/KDJ)   │
-                                     │ alpha_model.py (多因子融合+信号)   │
-                                     │ portfolio.py (仓位/分散)          │
+                                     │ alpha_model.py (纯8因子融合+信号)  │
+                                     │ portfolio.py (3阶段仓位+风控建议)  │
                                      └────────────────────────────────────┘
 ```
 
@@ -238,7 +238,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --output /mnt/user-data/workspace/screened.json
 ```
 
-返回 Top 50 股票，包含 alpha 评分、8 因子暴露分、风险标签。
+返回 Top 50 股票，包含 alpha 评分、8 因子暴露分(value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength)、所属基准指数(benchmark_code)、风险标签、市场状态(regime/regime_details)、基准指数指标(benchmarks)。
 
 #### Step B3: 获取 K 线数据
 
@@ -262,7 +262,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
 
 #### Step B5: Alpha 多因子融合
 
-融合基本面因子（V/G/Q/M/LV/S/I 共 8 因子，各 12.5%）与技术指标调整（MACD/RSI/KDJ，占 10%），生成买卖信号：
+融合 8 因子（value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength，各 12.5% 等权），生成买卖信号。**技术指标(RSI/MA/MACD/KDJ)不参与多因子 Alpha 模型**，技术分析仅在单股分析场景(A6)中独立使用：
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
@@ -273,30 +273,35 @@ python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
 
 #### Step B6: 组合优化
 
-行业分散约束（单行业 ≤ 30%）、风险标签约束、仓位归一化：
+3阶段仓位流水线：阶段一(Alpha加权+波动率调整+风险惩罚)、阶段二(行业≤25%+科技/消费主题≤50%+指数成分上限+相关性惩罚)、阶段三(现金预留+归一化)。风控建议独立输出不参与仓位计算：
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
   --signals /mnt/user-data/workspace/signals.json \
   --capital 1000000 \
+  --regime "震荡市" \
   --output /mnt/user-data/workspace/portfolio.json
 ```
 
-如果用户指定了资金量，替换 `--capital` 参数值。
+如果用户指定了资金量，替换 `--capital` 参数值。`--regime` 从 Step B2 返回的 `regime` 字段获取。
 
 #### Step B7: 呈现结果
 
 用 `read_file` 读取 `/mnt/user-data/workspace/portfolio.json`，按以下格式输出：
 
 ```
-[代码] [名称] | Alpha: XX | 信号: BUY/SELL | 建议仓位: X%
-因子: V:XX G:XX Q:XX M:XX LV:XX S:XX I:XX
+市场状态: [regime] — [regime_details.style]
+现金预留: [cash_reserve_pct]%
+
+[代码] [名称] | 行业: [industry] | 基准: [benchmark] | Alpha: XX | 信号: BUY/SELL | 仓位: X%
+因子: V:XX G:XX Q:XX M:XX LV:XX S:XX I:XX RS:XX
 风险: [标签列表]
 
 组合层面:
 - 持仓股票数: N
 - 行业分散度: N个行业
 - 总仓位: X%
+- 风控参考: 见 risk_advisory 字段
 ```
 
 ## Output Handling
@@ -344,4 +349,4 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 
 ## References
 
-- `references/factor_guide.md`: 8 因子详细定义、行业暴露、因子 IC/IR 参考
+- `references/factor_guide.md`: 8 因子详细定义(value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength)，动量剔除最近1月，硬性剔除规则，行业暴露，因子 IC/IR 参考
