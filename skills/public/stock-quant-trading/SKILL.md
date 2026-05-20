@@ -229,12 +229,13 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
 
 #### Step B4: Alpha 多因子融合
 
-融合 8 因子（value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength，各 12.5% 等权），生成买卖信号。**技术指标(RSI/MA/MACD/KDJ)不参与多因子 Alpha 模型**，但会在此步骤进行**近期破位后置检测**（因 screener 动量因子跳过最近 20 天），命中破位项 ≥2 则降级信号：
+融合 screener 端返回的市场状态动态权重（非等权），生成买卖信号。**技术指标(RSI/MA/MACD/KDJ)不参与多因子 Alpha 模型**，但会在此步骤进行**近期破位后置检测**（因 screener 动量因子跳过最近 20 天），命中破位项 ≥2 则降级信号：
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
   --screened /mnt/user-data/workspace/screened.json \
   --indicators /mnt/user-data/workspace/indicators.json \
+  --weights /mnt/user-data/workspace/screened_weights.json \
   --output /mnt/user-data/workspace/signals.json
 ```
 

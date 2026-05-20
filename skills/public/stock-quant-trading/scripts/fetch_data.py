@@ -114,6 +114,11 @@ def main():
     if args.action == "screener":
         result = fetch_screened_stocks(args.api_base, args.market, args.top_n)
         stocks = result.get("top_stocks", result.get("data", []))
+        regime_weights = result.get("regime_weights", {})
+        if regime_weights:
+            weights_file = args.output.replace(".json", "_weights.json") if args.output else "screened_weights.json"
+            with open(weights_file, "w") as f:
+                json.dump(regime_weights, f, ensure_ascii=False, indent=2)
     elif args.action == "klines":
         codes = [c.strip() for c in args.codes.split(",") if c.strip()]
         if len(codes) == 1:
