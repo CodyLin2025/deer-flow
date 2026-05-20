@@ -227,8 +227,12 @@ def main():
         try:
             with open(args.weights) as f:
                 weights = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+        except FileNotFoundError:
+            print(f"WARNING: Weights file not found ({args.weights}), using equal weights (0.125 each)", flush=True)
+        except json.JSONDecodeError:
+            print(f"WARNING: Weights file is invalid JSON ({args.weights}), using equal weights (0.125 each)", flush=True)
+    else:
+        print("WARNING: No --weights specified, using equal weights (0.125 each). Dynamic regime weights will be ignored.", flush=True)
 
     results = run_alpha_model(screened_list, indicators, weights=weights)
 

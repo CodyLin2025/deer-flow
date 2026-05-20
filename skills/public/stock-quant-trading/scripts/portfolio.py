@@ -139,6 +139,10 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
                 scales.append(0.7)
 
         final_scale = min(scales)
+        if len(scales) >= 2 and final_scale < 1.0:
+            sorted_scales = sorted(scales)
+            geo = math.sqrt(sorted_scales[0] * sorted_scales[1])
+            final_scale = min(final_scale * 1.15, geo) if geo < 1.0 else final_scale
         if final_scale < 1.0:
             p["position"] = round(original[i] * final_scale, 4)
 
@@ -146,16 +150,12 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
 
 
 def phase3_finalize(positions: list[dict], capital: float, cash_pct: float) -> dict:
+    target_total = 1.0 - cash_pct
     total_pos = sum(p["position"] for p in positions)
-    if total_pos > 1.0:
-        scale = 1.0 / total_pos
+    if total_pos > target_total:
+        scale = target_total / total_pos
         for p in positions:
             p["position"] = round(p["position"] * scale, 4)
-    elif total_pos < 0.30:
-        if total_pos > 0:
-            scale = 0.30 / total_pos
-            for p in positions:
-                p["position"] = round(p["position"] * scale, 4)
 
     stock_count = len(positions)
     if stock_count < 5:
