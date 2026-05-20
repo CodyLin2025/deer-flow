@@ -200,6 +200,18 @@ def compute_indicators(klines_data: list[dict]) -> dict:
     k, d, j = calc_kdj(highs, lows, closes)
     upper, mid, lower = calc_bollinger(closes)
 
+    change_5d = None
+    if len(closes) >= 6:
+        v5 = closes[-6]
+        if v5 and v5 != 0:
+            change_5d = (closes[-1] - v5) / v5 * 100
+
+    change_20d = None
+    if len(closes) >= 21:
+        v20 = closes[-21]
+        if v20 and v20 != 0:
+            change_20d = (closes[-1] - v20) / v20 * 100
+
     return {
         "latest": {
             "close": closes[-1] if closes else None,
@@ -209,16 +221,21 @@ def compute_indicators(klines_data: list[dict]) -> dict:
             "ma10": ma10[-1],
             "ma20": ma20[-1],
             "ma60": ma60[-1],
+            "ma5_prev": ma5[-2] if len(ma5) >= 2 else None,
+            "ma20_prev": ma20[-2] if len(ma20) >= 2 else None,
             "macd_dif": dif[-1],
             "macd_dea": dea[-1],
             "macd_hist": hist[-1],
             "rsi_14": rsi14[-1],
+            "rsi_14_prev": rsi14[-2] if len(rsi14) >= 2 else None,
             "kdj_k": k[-1],
             "kdj_d": d[-1],
             "kdj_j": j[-1],
             "boll_upper": upper[-1],
             "boll_mid": mid[-1],
             "boll_lower": lower[-1],
+            "change_5d": change_5d,
+            "change_20d": change_20d,
         },
         "full": {
             "closes": closes,

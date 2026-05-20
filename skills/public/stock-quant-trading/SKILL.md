@@ -11,7 +11,6 @@ allowed-tools:
 
 ## CRITICAL — 读此段后再执行任何操作
 
-- **严禁使用 `web_search` / `web_fetch` 获取任何数据** — 搜索引擎结果无法替代结构化量化数据
 - **所有数据通过 `stock-data-crawl` API + Python 脚本获取**，所有分析通过脚本计算
 - **正常流程不读取 `.py` 脚本源码** — 直接执行，不需要理解内部逻辑。若脚本返回异常(如 0 结果、非预期错误)可读取脚本确认输入/输出格式
 - **只能用 bash 工具依次执行下面的命令**，如果 bash 不可用则告知用户并停止，不要退化为搜索
@@ -39,12 +38,6 @@ stock-data-crawl (数据+筛选)            deer-flow Skill (分析+信号)
 
 - **stock-data-crawl 服务必须运行中**，API 地址通过 `STOCK_API_BASE_URL` 环境变量配置（在项目 `.env` 文件中设置），脚本会自动读取
 - Python 3 需在 sandbox 内可用
-- **Python 依赖**: `numpy` 必须可用。在每个 scenario 的 Step 1 中用以下命令验证：
-
-```bash
-python -c "import numpy; print('numpy ok')"
-```
-
 ## Workflow
 
 ### 判断走哪个流程
@@ -60,26 +53,13 @@ python -c "import numpy; print('numpy ok')"
 
 ### 场景 A: 单股 / 指定股票分析
 
-> **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。本场景全程不允许使用 web_search 或 web_fetch。
+> **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。
 
 当用户指定了一只或多只股票代码/名称时，进行完整的 **行情 + 技术 + 财务 + 研报 + 舆情** 多维度分析。
 
 > **K 线数据排序说明**: stock-data-crawl API 的 `/api/kline/{code}` 和 `/api/kline/batch` 按 `trade_date` **倒序**返回(最新在前)。`indicators.py` 内部已自动反转为正序(最旧在前)再计算，调用方无需额外处理。
 
-#### Step A1: 验证环境
-
-先确认 bash 工具、Python、numpy 依赖可正常使用（不要使用 web_search/web_fetch）：
-
-```bash
-echo "bash tool ready"
-python -c "import numpy; print('numpy ok')"
-```
-
-如果任何命令执行失败：
-- bash 失败 → 告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止
-- numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
-
-#### Step A2: 获取实时行情
+#### Step A1: 获取实时行情
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
@@ -90,7 +70,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 返回字段: `latest_price`, `change_pct`, `change_amount`, `pe_dynamic`, `pe_ttm`, `pb`, `total_market_cap`, `circulating_market_cap`, `volume`, `turnover`, `turnover_rate`, `amplitude`, `open`, `high`, `low`, `prev_close`, `volume_ratio`, `main_net_inflow`, `change_60d`, `change_ytd`, `trade_time`
 
-#### Step A3: 获取财务数据
+#### Step A2: 获取财务数据
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
@@ -101,7 +81,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 返回字段: `report_date`, `report_type`, `eps_basic`, `bps`, `cash_flow_ps`, `total_operate_revenue`, `parent_net_profit`, `deducted_net_profit`, `revenue_yoy`, `net_profit_yoy`, `deducted_profit_yoy`, `roe`, `roa`, `roic`, `net_profit_margin`, `gross_margin`, `current_ratio`, `asset_liability_ratio`, `ocf_to_revenue`, `interest_coverage_ratio`, `fcff_forward`, `eps_yoy`, `roe_yoy`
 
-#### Step A4: 获取研报数据
+#### Step A3: 获取研报数据
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
@@ -112,7 +92,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 返回近 180 天最多 20 条研报: `title`, `org_name`, `em_rating_name`, `rating_change`, `publisher_date`, `researcher`, `predict_this_year_eps`, `predict_this_year_pe`, `predict_next_year_eps`, `predict_next_year_pe`, `predict_next_two_year_eps`, `predict_next_two_year_pe`
 
-#### Step A5: 获取 K 线数据
+#### Step A4: 获取 K 线数据
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
@@ -122,7 +102,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --output /mnt/user-data/workspace/klines.json
 ```
 
-#### Step A6: 计算技术指标
+#### Step A5: 计算技术指标
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
@@ -130,7 +110,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
   --output /mnt/user-data/workspace/indicators.json
 ```
 
-#### Step A7: 获取新闻舆情
+#### Step A6: 获取新闻舆情
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
@@ -141,7 +121,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 如 API Key 未配置导致失败，跳过此步骤，在报告中标注"舆情数据暂缺"。
 
-#### Step A8: 呈现综合分析报告
+#### Step A7: 呈现综合分析报告
 
 依次用 `read_file` 读取所有 JSON 结果，按以下 6 个维度输出综合报告：
 
@@ -213,22 +193,9 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 ### 场景 B: 全市场量化选股
 
-> **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。本场景全程不允许使用 web_search 或 web_fetch。
+> **数据约束**: 所有数据通过下方脚本从 stock-data-crawl API 获取。
 
-#### Step B1: 验证环境
-
-先确认 bash 工具、Python、numpy 依赖可正常使用（不要使用 web_search/web_fetch）：
-
-```bash
-echo "bash tool ready"
-python -c "import numpy; print('numpy ok')"
-```
-
-如果任何命令执行失败：
-- bash 失败 → 告知用户 **"bash 工具不可用，无法执行量化分析"**，然后停止
-- numpy 失败 → 告知用户 **"numpy 未安装，请运行 pip install numpy"**，然后停止
-
-#### Step B2: 多因子筛选
+#### Step B1: 多因子筛选
 
 调用 stock-data-crawl 获取全市场 Top 50 股票：
 
@@ -240,7 +207,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 返回 Top 50 股票，包含 alpha 评分、8 因子暴露分(value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength)、所属基准指数(benchmark_code)、风险标签、市场状态(regime/regime_details)、基准指数指标(benchmarks)。
 
-#### Step B3: 获取 K 线数据
+#### Step B2: 获取 K 线数据
 
 先用 `read_file` 读取 `/mnt/user-data/workspace/screened.json`，从中提取所有股票的 `code` 字段，用逗号拼接后传入 `--codes`：
 
@@ -252,7 +219,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --output /mnt/user-data/workspace/klines.json
 ```
 
-#### Step B4: 计算技术指标
+#### Step B3: 计算技术指标
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
@@ -260,9 +227,9 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
   --output /mnt/user-data/workspace/indicators.json
 ```
 
-#### Step B5: Alpha 多因子融合
+#### Step B4: Alpha 多因子融合
 
-融合 8 因子（value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength，各 12.5% 等权），生成买卖信号。**技术指标(RSI/MA/MACD/KDJ)不参与多因子 Alpha 模型**，技术分析仅在单股分析场景(A6)中独立使用：
+融合 8 因子（value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength，各 12.5% 等权），生成买卖信号。**技术指标(RSI/MA/MACD/KDJ)不参与多因子 Alpha 模型**，但会在此步骤进行**近期破位后置检测**（因 screener 动量因子跳过最近 20 天），命中破位项 ≥2 则降级信号：
 
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
@@ -271,7 +238,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
   --output /mnt/user-data/workspace/signals.json
 ```
 
-#### Step B6: 组合优化
+#### Step B5: 组合优化
 
 3阶段仓位流水线：阶段一(Alpha加权+波动率调整+风险惩罚)、阶段二(行业≤25%+科技/消费主题≤50%+指数成分上限+相关性惩罚)、阶段三(现金预留+归一化)。风控建议独立输出不参与仓位计算：
 
@@ -285,7 +252,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 
 如果用户指定了资金量，替换 `--capital` 参数值。`--regime` 从 Step B2 返回的 `regime` 字段获取。
 
-#### Step B7: 呈现结果
+#### Step B6: 呈现结果
 
 用 `read_file` 读取 `/mnt/user-data/workspace/portfolio.json`，按以下格式输出：
 
@@ -296,6 +263,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 [代码] [名称] | 行业: [industry] | 基准: [benchmark] | Alpha: XX | 信号: BUY/SELL | 仓位: X%
 因子: V:XX G:XX Q:XX M:XX LV:XX S:XX I:XX RS:XX
 风险: [标签列表]
+破位: [breakdown_flags]
 
 组合层面:
 - 持仓股票数: N

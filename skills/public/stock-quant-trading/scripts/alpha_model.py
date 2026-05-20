@@ -4,8 +4,10 @@ Multi-Factor Alpha Model (deer-flow端)
 
 Fuses screener factor scores with risk flag adjustments
 to produce final alpha scores and buy/sell signals.
-Technical indicators are NOT part of the alpha model —
-they are used independently in single-stock analysis (Scenario A).
+Technical indicators are NOT part of the alpha score calculation,
+but are used as a post-screening breakdown filter to detect
+recent price deterioration that the momentum factor may miss
+(momentum skips the most recent 20 trading days by design).
 
 Usage:
     python alpha_model.py --screened data/screened.json --indicators data/indicators.json --output data/signals.json
@@ -57,6 +59,22 @@ def calc_factor_dispersion(factor_scores: dict[str, float]) -> float:
     return variance ** 0.5
 
 
+SIGNAL_ORDER = {
+    "strong_buy": 0,
+    "buy": 1,
+    "hold": 2,
+    "sell": 3,
+    "strong_sell": 4,
+}
+SIGNAL_REVERSE = {v: k for k, v in SIGNAL_ORDER.items()}
+
+
+def _degrade_signal(signal: str, steps: int) -> str:
+    idx = SIGNAL_ORDER.get(signal, 2)
+    new_idx = min(len(SIGNAL_ORDER) - 1, idx + steps)
+    return SIGNAL_REVERSE[new_idx]
+
+
 class AlphaModel:
     DEFAULT_WEIGHTS = {
         "value": 0.125,
@@ -71,6 +89,55 @@ class AlphaModel:
 
     def __init__(self, weights: dict[str, float] | None = None):
         self.weights = weights or self.DEFAULT_WEIGHTS
+
+    def _check_recent_breakdown(self, code: str, ind: dict | None) -> tuple[list[str], int]:
+        if ind is None:
+            return [], 0
+        latest = ind.get("latest", {}) if isinstance(ind, dict) else {}
+        if not latest:
+            return [], 0
+
+        flags: list[str] = []
+
+        close = latest.get("close")
+        ma5 = latest.get("ma5")
+        ma20 = latest.get("ma20")
+        ma60 = latest.get("ma60")
+        ma5_prev = latest.get("ma5_prev")
+        ma20_prev = latest.get("ma20_prev")
+        dif = latest.get("macd_dif")
+        dea = latest.get("macd_dea")
+        hist = latest.get("macd_hist")
+        rsi = latest.get("rsi_14")
+        change_5d = latest.get("change_5d")
+        change_20d = latest.get("change_20d")
+
+        if close is not None and ma20 is not None and close < ma20:
+            flags.append("跌破MA20")
+        elif close is not None and ma60 is not None and close < ma60:
+            flags.append("跌破MA60")
+
+        if (ma5 is not None and ma20 is not None and ma5 < ma20
+                and ma5_prev is not None and ma20_prev is not None
+                and ma5_prev >= ma20_prev):
+            flags.append("MA5/20死叉")
+
+        if rsi is not None and rsi < 40:
+            flags.append("RSI弱势")
+
+        if (dif is not None and dea is not None and dif < dea
+                and hist is not None and hist < 0):
+            flags.append("MACD死叉")
+
+        rapid_fall = False
+        if change_20d is not None and change_20d < -15:
+            rapid_fall = True
+        elif change_5d is not None and change_5d < -8:
+            rapid_fall = True
+        if rapid_fall:
+            flags.append("短期急跌")
+
+        return flags, len(flags)
 
     def compute(self, screened: dict, indicators: dict[str, dict]) -> dict:
         factor_scores = screened.get("factor_scores", {})
@@ -94,6 +161,25 @@ class AlphaModel:
                 signal = "buy"
             confidence = max(0, confidence - 10)
 
+        stock_ind = indicators.get(code)
+        breakdown_flags, breakdown_count = self._check_recent_breakdown(code, stock_ind)
+
+        if breakdown_count >= 4:
+            signal = "sell"
+            confidence = max(0, confidence - 30)
+            risk_flags = risk_flags + ["近期破位风险(≥4)"]
+        elif breakdown_count >= 3:
+            signal = _degrade_signal(signal, 2)
+            confidence = max(0, confidence - 20)
+            risk_flags = risk_flags + ["近期破位风险(≥3)"]
+        elif breakdown_count >= 2:
+            signal = _degrade_signal(signal, 1)
+            confidence = max(0, confidence - 15)
+            risk_flags = risk_flags + ["近期破位风险(≥2)"]
+        elif breakdown_count >= 1:
+            confidence = max(0, confidence - 10)
+            breakdown_flags = breakdown_flags
+
         return {
             "code": code,
             "name": screened.get("name", ""),
@@ -105,6 +191,8 @@ class AlphaModel:
             "signal": signal,
             "confidence": round(confidence, 2),
             "risk_flags": risk_flags,
+            "breakdown_flags": breakdown_flags,
+            "breakdown_count": breakdown_count,
             "total_market_cap": screened.get("total_market_cap"),
             "vol_60d": screened.get("vol_60d"),
         }
