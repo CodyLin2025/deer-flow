@@ -65,8 +65,6 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str) -> 
             pos = max(0.02, pos * 0.7)
         if "小市值风险" in risk_flags:
             pos = min(pos, 0.03)
-        if "上市不足1年" in risk_flags:
-            pos = min(pos, 0.03)
 
         positions.append({
             **s,

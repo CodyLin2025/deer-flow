@@ -114,7 +114,7 @@ class AlphaModel:
 
         if close is not None and ma20 is not None and close < ma20:
             flags.append("跌破MA20")
-        elif close is not None and ma60 is not None and close < ma60:
+        if close is not None and ma60 is not None and close < ma60:
             flags.append("跌破MA60")
 
         if (ma5 is not None and ma20 is not None and ma5 < ma20
