@@ -49,7 +49,8 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str) -> 
 
         vol_60d = s.get("vol_60d")
         if vol_60d is not None and vol_60d > 0:
-            vol_adj = 1.0 / (1.0 + vol_60d * k)
+            ann_vol = vol_60d * (250 ** 0.5)
+            vol_adj = 1.0 / (1.0 + ann_vol * k)
         else:
             vol_adj = 1.0
         pos = raw_pos * vol_adj
@@ -158,9 +159,6 @@ def phase3_finalize(positions: list[dict], capital: float, cash_pct: float) -> d
             p["position"] = round(p["position"] * scale, 4)
 
     stock_count = len(positions)
-    if stock_count < 5:
-        for p in positions:
-            p["position"] = min(0.25, p["position"])
 
     allocation = []
     for p in positions:

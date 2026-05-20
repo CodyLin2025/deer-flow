@@ -205,7 +205,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --output /mnt/user-data/workspace/screened.json
 ```
 
-返回 Top 50 股票，包含 alpha 评分、8 因子暴露分(value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength)、所属基准指数(benchmark_code)、风险标签、市场状态(regime/regime_details)、基准指数指标(benchmarks)。
+返回 Top 50 股票，包含 alpha 评分、8 因子暴露分(value/growth/quality/momentum/low_vol/sentiment/industry/relative_strength)、所属基准指数(benchmark_code)、风险标签。同时产出 `screened_meta.json` 包含市场状态(regime/regime_details)、基准指数指标(benchmarks)。
 
 #### Step B2: 获取 K 线数据
 
@@ -246,12 +246,13 @@ python /mnt/skills/public/stock-quant-trading/scripts/alpha_model.py \
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
   --signals /mnt/user-data/workspace/signals.json \
+  --indicators /mnt/user-data/workspace/indicators.json \
   --capital 1000000 \
   --regime "震荡市" \
   --output /mnt/user-data/workspace/portfolio.json
 ```
 
-如果用户指定了资金量，替换 `--capital` 参数值。`--regime` 从 Step B2 返回的 `regime` 字段获取。
+如果用户指定了资金量，替换 `--capital` 参数值。`--regime` 从 Step B1 返回的 `screened_meta.json` 中 `regime` 字段获取。
 
 #### Step B6: 呈现结果
 

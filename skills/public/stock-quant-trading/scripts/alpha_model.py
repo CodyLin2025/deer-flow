@@ -143,17 +143,23 @@ class AlphaModel:
         factor_scores = screened.get("factor_scores", {})
         code = screened.get("code", "")
 
-        factor_sum = sum(
-            self.weights.get(k, 0.125) * v
-            for k, v in factor_scores.items()
-        )
+        # Recompute with effective-weight normalization (matching screener pipeline.py Step 6)
+        factor_sum = 0.0
+        effective_weight = 0.0
+        for k, v in factor_scores.items():
+            w = self.weights.get(k, 0.125)
+            factor_sum += v * w
+            effective_weight += w
 
-        final_alpha = max(0, min(100, factor_sum))
+        if effective_weight > 0:
+            final_alpha = max(0, min(100, factor_sum / effective_weight))
+        else:
+            final_alpha = 50.0
 
         dispersion = calc_factor_dispersion(factor_scores)
         signal, confidence = determine_signal(final_alpha, dispersion)
 
-        risk_flags = screened.get("risk_flags", [])
+        risk_flags = list(screened.get("risk_flags", []))
         if "PE极端高" in risk_flags or "经营现金流为负" in risk_flags:
             if signal == "buy":
                 signal = "hold"
@@ -178,7 +184,6 @@ class AlphaModel:
             risk_flags = risk_flags + ["近期破位风险(≥2)"]
         elif breakdown_count >= 1:
             confidence = max(0, confidence - 10)
-            breakdown_flags = breakdown_flags
 
         return {
             "code": code,

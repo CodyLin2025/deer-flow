@@ -115,10 +115,21 @@ def main():
         result = fetch_screened_stocks(args.api_base, args.market, args.top_n)
         stocks = result.get("top_stocks", result.get("data", []))
         regime_weights = result.get("regime_weights", {})
+        # Save regime weights for alpha_model
         if regime_weights:
             weights_file = args.output.replace(".json", "_weights.json") if args.output else "screened_weights.json"
             with open(weights_file, "w") as f:
                 json.dump(regime_weights, f, ensure_ascii=False, indent=2)
+        # Save metadata (regime, benchmarks, details) for downstream use
+        meta_file = args.output.replace(".json", "_meta.json") if args.output else "screened_meta.json"
+        meta = {
+            "regime": result.get("regime", "unknown"),
+            "regime_details": result.get("regime_details", {}),
+            "benchmarks": result.get("benchmarks", {}),
+            "screened_count": result.get("screened_count", len(stocks) if isinstance(stocks, list) else 0),
+        }
+        with open(meta_file, "w") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
     elif args.action == "klines":
         codes = [c.strip() for c in args.codes.split(",") if c.strip()]
         if len(codes) == 1:
