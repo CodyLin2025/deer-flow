@@ -68,7 +68,7 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str, cap
 
         market_cap = s.get("total_market_cap", 0) or 0
         if market_cap > 0 and capital > 0:
-            turnover_rate = s.get("turnover_rate")
+            turnover_rate = s.get("avg_turnover_20d")
             if turnover_rate is not None and turnover_rate > 0:
                 turnover_decimal = turnover_rate / 100.0
             else:
