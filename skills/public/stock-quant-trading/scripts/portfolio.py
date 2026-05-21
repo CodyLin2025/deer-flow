@@ -56,7 +56,6 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str, cap
         pos = raw_pos * vol_adj
 
         risk_flags = s.get("risk_flags", [])
-        market_cap = s.get("total_market_cap", 0) or 0
 
         if "高杠杆" in risk_flags:
             pos = min(pos, 0.05)
@@ -69,7 +68,12 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str, cap
 
         market_cap = s.get("total_market_cap", 0) or 0
         if market_cap > 0 and capital > 0:
-            estimated_daily_turnover = market_cap * 0.015
+            turnover_rate = s.get("turnover_rate")
+            if turnover_rate is not None and turnover_rate > 0:
+                turnover_decimal = turnover_rate / 100.0
+            else:
+                turnover_decimal = 0.015
+            estimated_daily_turnover = market_cap * turnover_decimal
             max_trade_value = estimated_daily_turnover * 0.10
             liquidity_cap = max_trade_value / capital
             pos = min(pos, liquidity_cap)

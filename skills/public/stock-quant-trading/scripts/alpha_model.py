@@ -204,6 +204,7 @@ class AlphaModel:
             "breakdown_count": breakdown_count,
             "total_market_cap": screened.get("total_market_cap"),
             "vol_60d": screened.get("vol_60d"),
+            "turnover_rate": screened.get("turnover_rate"),
         }
 
 
