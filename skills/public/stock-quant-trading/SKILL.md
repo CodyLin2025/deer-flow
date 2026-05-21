@@ -112,11 +112,22 @@ python /mnt/skills/public/stock-quant-trading/scripts/indicators.py \
 
 #### Step A6: 获取新闻舆情
 
+默认启用权威财经网站白名单(东方财富/同花顺/新浪财经/和讯/巨潮/中证/证券时报/财联社/中国证券网) + 正负面双向搜索：
+
 ```bash
 python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
   --action news \
-  --query "恒瑞医药 600276 最新消息" \
+  --query "恒瑞医药 600276" \
   --output /mnt/user-data/workspace/news.json
+```
+
+输出格式：
+```json
+{
+  "positive": [{...}],
+  "negative": [{...}],
+  "total": N
+}
 ```
 
 如 API Key 未配置导致失败，跳过此步骤，在报告中标注"舆情数据暂缺"。
@@ -176,7 +187,10 @@ python /mnt/skills/public/stock-quant-trading/scripts/fetch_data.py \
 
 **5. 舆情分析**
 
-列出近期相关新闻摘要（如有），标注正/中/负面倾向。
+列出近期相关新闻摘要（如有）。舆情数据按正负面分向输出：
+- **正面信息**（利好/业绩/研报推荐/突破）：列出`news.json → positive` 中的新闻标题及来源
+- **负面信息**（利空/风险/监管/争议）：列出`news.json → negative` 中的新闻标题及来源
+- 如无数据标注"舆情数据暂缺"
 
 **6. 综合研判**
 

@@ -20,6 +20,18 @@ import urllib.error
 
 API_BASE = os.environ.get("STOCK_API_BASE_URL", "http://localhost:8000/api")
 
+# Authoritative Chinese financial websites (default whitelist for news search)
+_NEWS_INCLUDE_DEFAULT = (
+    "10jqka.com.cn|eastmoney.com|sina.com.cn|hexun.com|"
+    "cninfo.com.cn|cs.com.cn|stcn.com|cls.cn|cnstock.com"
+)
+
+# Sentiment-biased query templates used for bidirectional search
+_SENTIMENT_QUERIES = {
+    "positive": "%s 利好 业绩增长 研报推荐 突破",
+    "negative": "%s 利空 风险 监管 诉讼 下滑 争议",
+}
+
 
 def _post(url: str, body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body else None
@@ -72,9 +84,59 @@ def fetch_benchmark_klines(api_base: str = API_BASE, index_code: str = "000300",
     return _get(url)
 
 
-def fetch_news(api_base: str = API_BASE, query: str = "", count: int = 10) -> dict:
+def fetch_news(
+    api_base: str = API_BASE,
+    query: str = "",
+    count: int = 10,
+    include: str = "",
+    exclude: str = "",
+    sentiment: bool = True,
+) -> dict:
     url = f"{api_base}/search/web"
-    return _post(url, {"query": query, "count": count, "freshness": "oneMonth", "summary": True})
+
+    def _do_search(q: str) -> list:
+        body = {"query": q, "count": count, "freshness": "oneMonth", "summary": True}
+        if include:
+            body["include"] = include
+        if exclude:
+            body["exclude"] = exclude
+        result = _post(url, body)
+        items = result.get("data", result)
+        if isinstance(items, dict):
+            items = items.get("webPages", {}).get("value", items)
+        if isinstance(items, dict):
+            items = [items]
+        return items if isinstance(items, list) else []
+
+    if sentiment:
+        positive_items = _do_search(_SENTIMENT_QUERIES["positive"] % query)
+        negative_items = _do_search(_SENTIMENT_QUERIES["negative"] % query)
+
+        seen_urls: set[str] = set()
+        positive_tagged = []
+        negative_tagged = []
+
+        for item in positive_items:
+            url_key = item.get("url", item.get("name", ""))
+            if url_key not in seen_urls:
+                seen_urls.add(url_key)
+                item["sentiment"] = "positive"
+                positive_tagged.append(item)
+
+        for item in negative_items:
+            url_key = item.get("url", item.get("name", ""))
+            if url_key not in seen_urls:
+                seen_urls.add(url_key)
+                item["sentiment"] = "negative"
+                negative_tagged.append(item)
+
+        total = len(positive_tagged) + len(negative_tagged)
+        print(f"news: {total} items ({len(positive_tagged)} positive, {len(negative_tagged)} negative)")
+        return {"positive": positive_tagged, "negative": negative_tagged, "total": total}
+    else:
+        result = _do_search(query)
+        print(f"news: {len(result)} items")
+        return {"items": result, "total": len(result)}
 
 
 def fetch_stock_list(api_base: str = API_BASE, market: str = "all") -> dict:
@@ -107,6 +169,8 @@ def main():
     parser.add_argument("--days", type=int, default=250)
     parser.add_argument("--top-n", type=int, default=50)
     parser.add_argument("--query", default="")
+    parser.add_argument("--include", default="")
+    parser.add_argument("--exclude", default="")
     parser.add_argument("--output", default="")
 
     args = parser.parse_args()
@@ -144,8 +208,9 @@ def main():
         result = fetch_stock_list(args.api_base, args.market)
         stocks = result.get("data", [])
     elif args.action == "news":
-        result = fetch_news(args.api_base, args.query)
-        stocks = result.get("data", result)
+        include = args.include or _NEWS_INCLUDE_DEFAULT
+        result = fetch_news(args.api_base, args.query, include=include, exclude=args.exclude, sentiment=True)
+        stocks = result
     elif args.action == "quote":
         code = args.code or args.codes.split(",")[0].strip()
         result = fetch_quote(args.api_base, code)
@@ -166,7 +231,11 @@ def main():
     with open(output, "w") as f:
         json.dump(stocks, f, ensure_ascii=False, indent=2)
 
-    print(f"{args.action} → {output} ({len(stocks) if isinstance(stocks, list) else 1} items)")
+    if args.action == "news":
+        total = stocks.get("total", 0)
+        print(f"{args.action} → {output} ({total} items)")
+    else:
+        print(f"{args.action} → {output} ({len(stocks) if isinstance(stocks, list) else 1} items)")
 
 
 if __name__ == "__main__":
