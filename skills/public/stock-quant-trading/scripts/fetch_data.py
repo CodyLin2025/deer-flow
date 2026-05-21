@@ -23,7 +23,8 @@ API_BASE = os.environ.get("STOCK_API_BASE_URL", "http://localhost:8000/api")
 # Authoritative Chinese financial websites (default whitelist for news search)
 _NEWS_INCLUDE_DEFAULT = (
     "10jqka.com.cn|eastmoney.com|sina.com.cn|hexun.com|"
-    "cninfo.com.cn|cs.com.cn|stcn.com|cls.cn|cnstock.com"
+    "cninfo.com.cn|cs.com.cn|stcn.com|cls.cn|cnstock.com|"
+    "yicai.com|finance.cctv.com"
 )
 
 # Sentiment-biased query templates used for bidirectional search
