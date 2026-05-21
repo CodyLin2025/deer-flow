@@ -129,10 +129,12 @@ class AlphaModel:
                 and hist is not None and hist < 0):
             flags.append("MACD死叉")
 
+        rapid_fall_threshold_20d = -20 if code.startswith(("688", "300", "301")) else -15
+        rapid_fall_threshold_5d = -12 if code.startswith(("688", "300", "301")) else -8
         rapid_fall = False
-        if change_20d is not None and change_20d < -15:
+        if change_20d is not None and change_20d < rapid_fall_threshold_20d:
             rapid_fall = True
-        elif change_5d is not None and change_5d < -8:
+        elif change_5d is not None and change_5d < rapid_fall_threshold_5d:
             rapid_fall = True
         if rapid_fall:
             flags.append("短期急跌")
@@ -143,18 +145,20 @@ class AlphaModel:
         factor_scores = screened.get("factor_scores", {})
         code = screened.get("code", "")
 
-        # Recompute with effective-weight normalization (matching screener pipeline.py Step 6)
-        factor_sum = 0.0
-        effective_weight = 0.0
-        for k, v in factor_scores.items():
-            w = self.weights.get(k, 0.125)
-            factor_sum += v * w
-            effective_weight += w
-
-        if effective_weight > 0:
-            final_alpha = max(0, min(100, factor_sum / effective_weight))
+        precomputed_alpha = screened.get("alpha_score")
+        if precomputed_alpha is not None:
+            final_alpha = precomputed_alpha
         else:
-            final_alpha = 50.0
+            factor_sum = 0.0
+            effective_weight = 0.0
+            for k, v in factor_scores.items():
+                w = self.weights.get(k, 0.125)
+                factor_sum += v * w
+                effective_weight += w
+            if effective_weight > 0:
+                final_alpha = max(0, min(100, factor_sum / effective_weight))
+            else:
+                final_alpha = 50.0
 
         dispersion = calc_factor_dispersion(factor_scores)
         signal, confidence = determine_signal(final_alpha, dispersion)
@@ -237,7 +241,10 @@ def main():
         except json.JSONDecodeError:
             print(f"WARNING: Weights file is invalid JSON ({args.weights}), using equal weights (0.125 each)", flush=True)
     else:
-        print("WARNING: No --weights specified, using equal weights (0.125 each). Dynamic regime weights will be ignored.", flush=True)
+        print("WARNING: No --weights specified, using equal weights (0.125 each). "
+              "Dynamic regime weights will be ignored. "
+              "Alpha scores may differ from screener output. "
+              "Pass --weights <screened_weights.json> to match regime weights.", flush=True)
 
     results = run_alpha_model(screened_list, indicators, weights=weights)
 

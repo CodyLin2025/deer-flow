@@ -28,7 +28,7 @@ def _vol_k_for_regime(regime: str) -> float:
         return 4.0
 
 
-def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str) -> list[dict]:
+def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str, capital: float = 1000000) -> list[dict]:
     k = _vol_k_for_regime(regime)
 
     buy_signals = [s for s in signals if s["signal"] in ("strong_buy", "buy")]
@@ -66,6 +66,13 @@ def phase1_init_positions(signals: list[dict], cash_pct: float, regime: str) -> 
             pos = max(0.02, pos * 0.7)
         if "小市值风险" in risk_flags:
             pos = min(pos, 0.03)
+
+        market_cap = s.get("total_market_cap", 0) or 0
+        if market_cap > 0 and capital > 0:
+            estimated_daily_turnover = market_cap * 0.015
+            max_trade_value = estimated_daily_turnover * 0.10
+            liquidity_cap = max_trade_value / capital
+            pos = min(pos, liquidity_cap)
 
         positions.append({
             **s,
@@ -120,6 +127,15 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
         key = (p.get("industry", "其他") or "其他", p.get("benchmark", "") or "000852")
         sector_benchmark_count[key] = sector_benchmark_count.get(key, 0) + 1
 
+    sb_indices: dict[tuple, list[int]] = {}
+    for i, p in enumerate(result):
+        sb_key = (p.get("industry", "其他") or "其他", p.get("benchmark", "") or "000852")
+        if sb_key not in sb_indices:
+            sb_indices[sb_key] = []
+        sb_indices[sb_key].append(i)
+
+    max_per_sb = max(2, int(math.floor(len(result) / 6)))
+
     for i, p in enumerate(result):
         ind = p.get("industry", "其他") or "其他"
         bm = p.get("benchmark", "") or "000852"
@@ -134,9 +150,11 @@ def phase2_diversify(positions: list[dict]) -> list[dict]:
             scales.append(theme_scales["consume"])
         if bm in benchmark_scales:
             scales.append(benchmark_scales[bm])
-        if sector_benchmark_count.get(sb_key, 0) > 2:
-            sb_index = sum(1 for j in range(i) if (result[j].get("industry", "其他") or "其他", result[j].get("benchmark", "") or "000852") == sb_key)
-            if sb_index >= 2:
+        sb_total = sector_benchmark_count.get(sb_key, 0)
+        if sb_total > max_per_sb:
+            idx_list = sb_indices[sb_key]
+            sb_index = sum(1 for j in idx_list if j < i)
+            if sb_index >= max_per_sb:
                 scales.append(0.7)
 
         final_scale = min(scales)
@@ -224,7 +242,7 @@ def generate_portfolio(signals: list[dict], capital: float, regime: str = "默�
     cash_map = {"趋势上涨": 0.10, "震荡市": 0.20, "趋势下跌": 0.40, "高波动": 0.30}
     cash_pct = cash_map.get(regime, 0.20)
 
-    positions = phase1_init_positions(signals, cash_pct, regime)
+    positions = phase1_init_positions(signals, cash_pct, regime, capital)
     positions = phase2_diversify(positions)
     portfolio = phase3_finalize(positions, capital, cash_pct)
 
