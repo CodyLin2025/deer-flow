@@ -200,13 +200,15 @@ def phase3_finalize(positions: list[dict], capital: float, cash_pct: float) -> d
         })
 
     sectors = set(a["industry"] for a in allocation if a["industry"])
+    total_pos_pct = round(sum(a["position_pct"] for a in allocation), 2)
     return {
         "total_capital": capital,
         "cash_reserve": round(capital * cash_pct, 2),
         "cash_reserve_pct": round(cash_pct * 100, 1),
+        "actual_idle_cash": round(capital * (1 - total_pos_pct / 100), 2),
         "stock_count": len(allocation),
         "sector_count": len(sectors),
-        "total_position_pct": round(sum(a["position_pct"] for a in allocation), 2),
+        "total_position_pct": total_pos_pct,
         "allocations": allocation,
     }
 
