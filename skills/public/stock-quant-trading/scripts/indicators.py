@@ -26,6 +26,8 @@ def calc_ema(closes: list[float], period: int) -> list[float | None]:
     result: list[float | None] = [None] * len(closes)
     if not closes:
         return result
+    if len(closes) < period:
+        return result
     multiplier = 2.0 / (period + 1)
     result[period - 1] = sum(closes[:period]) / period
     for i in range(period, len(closes)):
