@@ -270,32 +270,149 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 
 如果用户指定了资金量，替换 `--capital` 参数值。`--regime` 从 Step B1 返回的 `screened_meta.json` 中 `regime` 字段获取。
 
-#### Step B6: 呈现结果
+#### Step B6: 生成并输出完整报告
 
-用 `read_file` 读取 `/mnt/user-data/workspace/portfolio.json`，按以下格式输出：
+> **关键规则**: 必须在 B5 完成后读取所有相关 JSON 文件，按以下结构逐节输出完整报告。**禁止只列出文件路径而不输出表格和分析内容**。用户需要看到可直接阅读的量化分析报告，不是中间文件清单。
 
+##### B6a: 读取数据源
+
+按顺序用 `read_file` 读取以下文件（每个文件都必须读取，不可跳过）：
+
+```bash
+read_file /mnt/user-data/workspace/screened_meta.json    # 市场状态、基准指标
+read_file /mnt/user-data/workspace/screened_weights.json  # 8因子权重
+read_file /mnt/user-data/workspace/signals.json            # 每只股票的因子分、信号、破位标记
+read_file /mnt/user-data/workspace/portfolio.json          # 最终持仓、仓位、风险标记
 ```
-市场状态: [regime] — [regime_details.style]
-现金预留: [cash_reserve_pct]%
 
-[代码] [名称] | 行业: [industry] | 基准: [benchmark] | Alpha: XX | 信号: BUY/SELL | 仓位: X%
-因子: V:XX G:XX Q:XX M:XX LV:XX S:XX I:XX RS:XX
-风险: [标签列表]
-破位: [breakdown_flags]
+##### B6b: 报告结构（必须按以下 6 个章节顺序输出）
 
-组合层面:
-- 持仓股票数: N
-- 行业分散度: N个行业
-- 总仓位: X%
-- 风控参考: 见 risk_advisory 字段
-```
+> **格式要求**:
+> - 每个表格必须用 Markdown 表格呈现，数值精确到小数点后 2 位
+> - 关键数值使用 **粗体** 高亮
+> - 图表 URL 使用 `![描述](URL)` 嵌入（如有生成）
+> - 不要输出原始 JSON，必须转换为可读的表格/列表
+> - 报告以 `# 📊 全市场量化选股 — 完整报告` 开头
+
+---
+
+**一、市场总览**
+
+从 `screened_meta.json` 提取数据，输出以下表格：
+
+| 维度 | 状态 |
+|------|------|
+| 市场状态 | [regime] |
+| 风格 | [regime_details.style] · [growth_style] |
+| 筛选范围 | [screened_count] 只 → Top 50 → 优化为 [stock_count] 只 |
+
+以及各基准指数 60 日表现：
+
+| 指数 | 代码 | 60日涨跌幅 | 60日波动率 |
+|------|------|:---------:|:---------:|
+| 沪深300 | 000300 | +XX% | XX |
+| 科创50 | 000688 | +XX% | XX |
+| 中证1000 | 000852 | +XX% | XX |
+| 创业板指 | 399006 | +XX% | XX |
+
+---
+
+**二、因子权重配置**
+
+从 `screened_weights.json` 提取权重，输出表格并按权重降序排列：
+
+| 因子 | 权重 | 说明 |
+|------|:----:|------|
+| 成长 (Growth) | **XX%** | 核心驱动：高营收/利润增速 |
+| 动量 (Momentum) | **XX%** | 核心驱动：价格趋势延续 |
+| 质量 (Quality) | XX% | 盈利能力和财务健康 |
+| 情绪 (Sentiment) | XX% | 市场关注度和资金流向 |
+| 行业 (Industry) | XX% | 行业暴露和轮动 |
+| 相对强度 (RS) | XX% | 相对基准的超额表现 |
+| 价值 (Value) | XX% | 低估值保护 |
+| 低波 (Low Vol) | XX% | 波动率控制 |
+
+> **可选增强**: 可调用 chart-visualization 技能生成雷达图展示因子权重分布。方法：
+> 1. 加载 `chart-visualization` 技能: `read_file /mnt/skills/public/chart-visualization/SKILL.md`
+> 2. 读取参考: `read_file /mnt/skills/public/chart-visualization/references/generate_radar_chart.md`
+> 3. 生成: `node /mnt/skills/public/chart-visualization/scripts/generate.js '{"tool":"generate_radar_chart","args":{"data":[{"name":"Growth","value":XX},...],"title":"8因子权重配置","width":600,"height":400}}'`
+> 4. 输出 URL 前先 `read_file` 确认生成成功
+> 如果 chart-visualization 技能文件不存在或脚本不可用，跳过图表生成，只输出表格。
+
+---
+
+**三、组合配置方案**
+
+从 `portfolio.json` 提取总览数据：
+
+| 指标 | 数值 |
+|------|:----:|
+| 总资金 | ¥[total_capital] |
+| 持仓股票 | **[stock_count] 只** |
+| 覆盖行业 | **[sector_count] 个** |
+| 总仓位 | **[total_position_pct]%** |
+| 现金储备 | ¥[cash_reserve] ([cash_reserve_pct]%) |
+
+> **可选增强**: 生成 3 张可视化图表：
+> - **行业分布饼图**: 从 `portfolio.json` 的 `allocations[].industry` 统计各行业出现次数
+> - **个股仓位条形图**: 从 `allocations[]` 提取 `name` + `position_pct`
+> - **Alpha评分 vs 波动率散点图**: 从 `allocations[]` 提取 `alpha_score`(x) + `vol_60d`(y)，`name` 作为标注
+> 
+> 方法同上：加载 chart-visualization 技能 → 读取对应参考文件 → 执行 generate.js → 嵌入 `![](URL)`
+> 在报告三章中分别嵌入对应的图表。
+> 如果 chart-visualization 技能文件不存在或脚本不可用，跳过图表生成，只输出数据表格。
+
+---
+
+**四、组合详细持仓**（核心章节，必须完整输出）
+
+从 `portfolio.json` 的 `allocations[]` 逐只输出表格，每行包含：代码、名称、行业、基准、Alpha评分、信号、仓位%、配置金额、vol_60d、风险标记。
+
+> **因子分补充**: 每只股票下方另起一行用小字列出因子分值（从 `signals.json` 中按 code 匹配 `factor_scores`）和破位标记（如有）。格式：`因子: V:XX G:XX Q:XX M:XX LV:XX S:XX I:XX RS:XX | 破位: [列表]`
+
+表格格式：
+
+| # | 代码 | 名称 | 行业 | 基准 | Alpha | 信号 | 仓位% | 配置金额 | 风险标记 |
+|:-:|:----:|:----:|:----:|:----:|:-----:|:----:|:-----:|:--------:|:--------:|
+| 1 | XXXXXX | XX | XX | XXXX | **XX.XX** | BUY | X.XX% | ¥XX,XXX | 标签 |
+
+输出完所有持股后，列出**信号为 sell 的股票**（从 `signals.json` 中筛选 `signal == "sell"`），以提示用户规避风险。
+
+---
+
+**五、风控参考**
+
+从 `portfolio.json` 的 `risk_advisory` 字段提取风控建议，逐条列出。
+
+此外，按风险类型汇总 `allocations[].risk_flags`，统计：
+- 哪些股票有止盈提示（60日涨幅偏高）
+- 哪些股票有止损/破位提示
+- 哪些股票有财务风险标记（PE极端、现金流为负、高杠杆等）
+- 总仓位预警：如 <30% 则说明模型在当前市场状态下偏保守
+
+---
+
+**六、总结**
+
+融合以上 5 个章节，用 2-3 段文字总结：
+
+- **模型判断**: 当前市场状态下模型的倾向（积极/中性/保守），核心配置主线（行业主题）
+- **仓位逻辑**: 为什么当前仓位是这个水平（市场波动、个股风险评分、行业分散度等）
+- **核心风险**: 需要关注的系统性风险和个股风险
+
+> 结尾必须附上:
+> **免责声明**: 以上分析基于量化模型和公开数据，不构成投资建议。股市有风险，投资需谨慎。
+
+---
 
 ## Output Handling
 
-- 所有中间结果输出到 `/mnt/user-data/workspace/`
-- 单股分析 → 读取 `indicators.json`，格式化技术指标
-- 全市场选股 → 读取 `portfolio.json`，列出持仓建议
-- 用 `read_file` 读取 JSON 结果，以表格/结构化文本呈现
+- 所有中间结果（JSON 文件）输出到 `/mnt/user-data/workspace/`
+- 单股分析 → 读取 `indicators.json` + `finance.json` + `report.json`，按场景 A7 的 6 维度模板输出结构化报告
+- 全市场选股 → 读取 `screened_meta.json` + `screened_weights.json` + `signals.json` + `portfolio.json`，按场景 B6 的 6 章节模板输出完整报告
+- 图表生成 → 可选调用 `chart-visualization` 技能，如技能不可用则只输出数据表格
+- **报告中禁止输出原始 JSON 内容**，必须转换为可读的 Markdown 表格/列表/段落
+- 所有数值保留 2 位小数，百分比保留 1 位，金额保留整数（如 ¥14,500）
 
 ## Error Handling
 
