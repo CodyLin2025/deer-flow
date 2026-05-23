@@ -242,7 +242,7 @@ def compute_risk_advisory(allocations: list[dict], indicators: dict, total_capit
     return advisory
 
 
-def generate_portfolio(signals: list[dict], capital: float, regime: str = "默认") -> dict:
+def generate_portfolio(signals: list[dict], capital: float, regime: str = "震荡市") -> dict:
     cash_map = {"趋势上涨": 0.10, "震荡市": 0.20, "趋势下跌": 0.40, "高波动": 0.30}
     cash_pct = cash_map.get(regime, 0.20)
 
@@ -258,7 +258,7 @@ def main():
     parser.add_argument("--signals", required=True, help="Signals JSON")
     parser.add_argument("--indicators", required=False, default=None, help="Indicators JSON (for advisory)")
     parser.add_argument("--capital", type=float, default=1000000, help="Capital amount")
-    parser.add_argument("--regime", type=str, default="默认", help="Market regime label")
+    parser.add_argument("--regime", type=str, default="震荡市", help="Market regime label")
     parser.add_argument("--output", required=True, help="Output portfolio JSON")
     args = parser.parse_args()
 

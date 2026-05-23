@@ -264,7 +264,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
   --signals /mnt/user-data/workspace/signals.json \
   --indicators /mnt/user-data/workspace/indicators.json \
   --capital 1000000 \
-  --regime "震荡市" \
+  --regime $(jq -r '.regime' /mnt/user-data/workspace/screened_meta.json) \
   --output /mnt/user-data/workspace/portfolio.json
 ```
 
