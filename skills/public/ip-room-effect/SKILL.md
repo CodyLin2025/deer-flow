@@ -34,7 +34,10 @@ description: 当用户需要生成 IP 主题酒店房间效果图时使用此技
 调用后端接口查询指定 IP 和房间区域的可用物料：
 
 ```bash
-curl "${STOCK_API_BASE_URL}/api/ip-room/materials?ip_name=ultraman&room_region=suite_bedroom"
+python /mnt/skills/public/ip-room-effect/scripts/generate.py \
+  --query-materials \
+  --ip-name ultraman \
+  --room-region suite_bedroom
 ```
 
 **区域参数说明：**
