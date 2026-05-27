@@ -24,19 +24,29 @@ description: 当用户需要生成 IP 主题酒店房间效果图时使用此技
 
 - **房间原图**：用户上传的多张不同角度的酒店房间原图
 - **IP 主题**：要使用的 IP（如 奥特曼、芭比、哆啦A梦 等）
+- **房间区域**：目标房间区域（套房客厅、套房卧室、标间卧室、单人间卧室、卫生间）
 - **物料类型**：要添加的软装类型（地毯、挂画、抱枕、床盖、窗帘，默认全部）
 - **风格偏好**：可选的风格说明（如"温馨亲子风格"）
 - 无需检查 `/mnt/user-data` 下的文件夹
 
 ### 步骤 2：确认物料
 
-调用后端接口查询指定 IP 的可用物料：
+调用后端接口查询指定 IP 和房间区域的可用物料：
 
 ```bash
-curl "${STOCK_API_BASE_URL}/api/ip-room/materials?ip_name=ultraman"
+curl "${STOCK_API_BASE_URL}/api/ip-room/materials?ip_name=ultraman&room_region=suite_bedroom"
 ```
 
-将返回的物料列表（类型、名称、描述）展示给用户确认。用户可以增减物料类型或指定具体物料名称。
+**区域参数说明：**
+| 区域值 | 说明 |
+|--------|------|
+| `suite_living_room` | 套房客厅 —— 沙发、茶几、电视柜、落地窗 |
+| `suite_bedroom` | 套房卧室 —— 大床、床头柜、衣柜 |
+| `standard_bedroom` | 标间卧室 —— 两张单人床、床头柜 |
+| `single_bedroom` | 单人间卧室 —— 单人床、床头柜 |
+| `bathroom` | 卫生间 —— 洗手台、马桶、淋浴区、镜子 |
+
+将返回的物料列表（区域、类型、名称、描述）展示给用户确认。用户可以增减物料类型或指定具体物料名称。
 
 ### 步骤 3：生成提示词
 
@@ -48,6 +58,7 @@ curl "${STOCK_API_BASE_URL}/api/ip-room/materials?ip_name=ultraman"
 python /mnt/skills/public/ip-room-effect/scripts/generate.py \
   --room-images /path/to/room1.jpg /path/to/room2.jpg /path/to/room3.jpg \
   --ip-name ultraman \
+  --room-region suite_bedroom \
   --material-types carpet painting pillow bedspread curtain \
   --style-note "温馨亲子风格" \
   --output-dir /mnt/user-data/outputs/ip-room/ \
@@ -66,6 +77,7 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 python /mnt/skills/public/ip-room-effect/scripts/generate.py \
   --room-images /path/to/room1.jpg /path/to/room2.jpg /path/to/room3.jpg \
   --ip-name ultraman \
+  --room-region suite_bedroom \
   --output-dir /mnt/user-data/outputs/ip-room/ \
   --prompt-file /mnt/user-data/outputs/ip-room/prompt.json
 ```
@@ -78,6 +90,7 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 python /mnt/skills/public/ip-room-effect/scripts/generate.py \
   --room-images /path/to/room1.jpg /path/to/room2.jpg /path/to/room3.jpg \
   --ip-name ultraman \
+  --room-region suite_bedroom \
   --material-types carpet painting pillow bedspread curtain \
   --output-dir /mnt/user-data/outputs/ip-room/
 ```
@@ -91,6 +104,7 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 |------|------|------|
 | `--room-images` | 是 | 房间原图文件路径，多张空格分隔 |
 | `--ip-name` | 是 | IP 名称，如 `ultraman`、`barbie` |
+| `--room-region` | 是 | 房间区域：`suite_living_room`、`suite_bedroom`、`standard_bedroom`、`single_bedroom`、`bathroom` |
 | `--material-types` | 否 | 要添加的物料类型，默认全部 |
 | `--style-note` | 否 | 风格说明文字 |
 | `--output-dir` | 是 | 效果图输出目录 |

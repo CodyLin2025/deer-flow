@@ -5,6 +5,7 @@ Usage (完整流程):
     python generate.py \
         --room-images /path/to/room1.jpg /path/to/room2.jpg \
         --ip-name ultraman \
+        --room-region suite_bedroom \
         --material-types carpet painting pillow bedspread curtain \
         --output-dir /mnt/user-data/outputs/ip-room/
 
@@ -12,6 +13,7 @@ Usage (仅生成提示词):
     python generate.py \
         --room-images /path/to/room1.jpg /path/to/room2.jpg \
         --ip-name ultraman \
+        --room-region suite_bedroom \
         --output-dir /mnt/user-data/outputs/ip-room/ \
         --prompt-only
 
@@ -19,6 +21,7 @@ Usage (使用已有提示词生图):
     python generate.py \
         --room-images /path/to/room1.jpg /path/to/room2.jpg \
         --ip-name ultraman \
+        --room-region suite_bedroom \
         --output-dir /mnt/user-data/outputs/ip-room/ \
         --prompt-file /mnt/user-data/outputs/ip-room/prompt.json
 """
@@ -39,8 +42,11 @@ def encode_image(image_path: str) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def list_materials(ip_name: str) -> list[dict]:
-    resp = httpx.get(f"{API_BASE}/api/ip-room/materials", params={"ip_name": ip_name})
+def list_materials(ip_name: str, room_region: str | None = None) -> list[dict]:
+    params = {"ip_name": ip_name}
+    if room_region:
+        params["room_region"] = room_region
+    resp = httpx.get(f"{API_BASE}/api/ip-room/materials", params=params)
     resp.raise_for_status()
     data = resp.json()
     if data["code"] != 200:
@@ -51,12 +57,14 @@ def list_materials(ip_name: str) -> list[dict]:
 
 def call_generate_prompt(
     ip_name: str,
+    room_region: str,
     room_images_b64: list[str],
     material_types: list[str],
     style_note: str | None,
 ) -> dict:
     payload = {
         "ip_name": ip_name,
+        "room_region": room_region,
         "room_images": room_images_b64,
         "material_types": material_types,
     }
@@ -132,6 +140,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate IP Room Effect Images")
     parser.add_argument("--room-images", nargs="+", required=True, help="房间原图文件路径（多角度）")
     parser.add_argument("--ip-name", required=True, help="IP 名称")
+    parser.add_argument("--room-region", required=True, help="房间区域: suite_living_room, suite_bedroom, standard_bedroom, single_bedroom, bathroom")
     parser.add_argument("--material-types", nargs="+", default=["carpet", "painting", "pillow", "bedspread", "curtain"], help="要添加的物料类型")
     parser.add_argument("--style-note", default=None, help="风格说明")
     parser.add_argument("--output-dir", default="./outputs", help="效果图输出目录")
@@ -154,16 +163,17 @@ def main():
             prompt_data = json.load(f)
         print(f"Loaded prompt from {args.prompt_file}")
     else:
-        print(f"Fetching materials for IP '{args.ip_name}'...")
-        materials = list_materials(args.ip_name)
+        print(f"Fetching materials for IP '{args.ip_name}' region '{args.room_region}'...")
+        materials = list_materials(args.ip_name, args.room_region)
         if not materials:
-            print(f"No materials found for IP '{args.ip_name}'")
+            print(f"No materials found for IP '{args.ip_name}' region '{args.room_region}'")
             sys.exit(1)
         print(f"Found {len(materials)} materials")
 
         print("Generating prompt...")
         prompt_data = call_generate_prompt(
             args.ip_name,
+            args.room_region,
             room_images_b64,
             args.material_types,
             args.style_note,
