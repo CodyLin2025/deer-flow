@@ -40,7 +40,7 @@ from pathlib import Path
 
 import httpx
 
-API_BASE = os.environ.get("STOCK_API_BASE_URL", "http://localhost:8000")
+API_BASE = os.environ.get("STOCK_API_BASE_URL", "http://localhost:8000/api")
 
 
 def encode_image(image_path: str) -> str:
@@ -52,7 +52,7 @@ def list_materials(ip_name: str, room_region: str | None = None) -> list[dict]:
     params = {"ip_name": ip_name}
     if room_region:
         params["room_region"] = room_region
-    resp = httpx.get(f"{API_BASE}/api/ip-room/materials", params=params)
+    resp = httpx.get(f"{API_BASE}/ip-room/materials", params=params)
     resp.raise_for_status()
     data = resp.json()
     if data["code"] != 200:
@@ -77,7 +77,7 @@ def call_generate_prompt(
     if style_note:
         payload["style_note"] = style_note
 
-    resp = httpx.post(f"{API_BASE}/api/ip-room/generate-prompt", json=payload, timeout=180)
+    resp = httpx.post(f"{API_BASE}/ip-room/generate-prompt", json=payload, timeout=180)
     resp.raise_for_status()
     data = resp.json()
     if data["code"] != 200:
@@ -105,7 +105,7 @@ def call_generate_images(
     if negative_prompt:
         payload["negative_prompt"] = negative_prompt
 
-    resp = httpx.post(f"{API_BASE}/api/ip-room/generate-image", json=payload, timeout=600)
+    resp = httpx.post(f"{API_BASE}/ip-room/generate-image", json=payload, timeout=600)
     resp.raise_for_status()
     data = resp.json()
     if data["code"] != 200:
