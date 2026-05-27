@@ -24,6 +24,12 @@ Usage (使用已有提示词生图):
         --room-region suite_bedroom \
         --output-dir /mnt/user-data/outputs/ip-room/ \
         --prompt-file /mnt/user-data/outputs/ip-room/prompt.json
+
+Usage (仅查询物料):
+    python generate.py \
+        --query-materials \
+        --ip-name ultraman \
+        --room-region suite_bedroom
 """
 
 import base64
@@ -138,7 +144,8 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate IP Room Effect Images")
-    parser.add_argument("--room-images", nargs="+", required=True, help="房间原图文件路径（多角度）")
+    parser.add_argument("--query-materials", action="store_true", help="仅查询物料清单，不需要房间图")
+    parser.add_argument("--room-images", nargs="+", help="房间原图文件路径（多角度），--query-materials 模式下不需要")
     parser.add_argument("--ip-name", required=True, help="IP 名称")
     parser.add_argument("--room-region", required=True, help="房间区域: suite_living_room, suite_bedroom, standard_bedroom, single_bedroom, bathroom")
     parser.add_argument("--material-types", nargs="+", default=["carpet", "painting", "pillow", "bedspread", "curtain"], help="要添加的物料类型")
@@ -149,6 +156,24 @@ def main():
     parser.add_argument("--prompt-file", default=None, help="使用已有提示词文件直接生图")
 
     args = parser.parse_args()
+
+    if args.query_materials:
+        print(f"Fetching materials for IP '{args.ip_name}' region '{args.room_region}'...")
+        materials = list_materials(args.ip_name, args.room_region)
+        if not materials:
+            print(f"No materials found for IP '{args.ip_name}' region '{args.room_region}'")
+            sys.exit(0)
+        width = 20
+        print(f"\n{'Type'.ljust(width)}{'Name'.ljust(width)}Description")
+        print("-" * 80)
+        for m in materials:
+            print(f"{m['material_type'].ljust(width)}{m['material_name'].ljust(width)}{m['description']}")
+        print(f"\nTotal: {len(materials)} materials")
+        return
+
+    if not args.room_images:
+        print("Error: --room-images is required in this mode")
+        sys.exit(1)
 
     for img_path in args.room_images:
         if not os.path.exists(img_path):

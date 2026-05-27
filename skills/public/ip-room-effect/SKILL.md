@@ -16,6 +16,14 @@ description: 当用户需要生成 IP 主题酒店房间效果图时使用此技
 - 通过火山引擎组图模式一次生成多张角度一致的效果图
 - 严格保持硬装不变，只叠加软装物料
 
+## 重要规则
+
+> [!IMPORTANT]
+> - **所有操作必须通过 `generate.py` 脚本完成**，一步生成模式或分步模式均可
+> - **严禁自行编写内联 Python 代码**（`python -c`、`python3 -c` 等）或直接调用 HTTP API
+> - **严禁读取脚本源码** —— 只需传入正确的参数直接调用
+> - **如果脚本返回错误，将脚本输出原文展示给用户**，不要尝试用内联代码去调试
+
 ## 工作流
 
 ### 步骤 1：理解需求
@@ -30,8 +38,6 @@ description: 当用户需要生成 IP 主题酒店房间效果图时使用此技
 - 无需检查 `/mnt/user-data` 下的文件夹
 
 ### 步骤 2：确认物料
-
-调用后端接口查询指定 IP 和房间区域的可用物料：
 
 ```bash
 python /mnt/skills/public/ip-room-effect/scripts/generate.py \
@@ -53,9 +59,7 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 
 ### 步骤 3：生成提示词
 
-调用多模态大模型，将房间原图和确认的物料图一同传入，分析房间结构和物料特征后生成生图提示词。
-
-调用 Python 脚本：
+调用 Python 脚本生成提示词。脚本内部会自动调用多模态大模型分析房间结构和物料特征。
 
 ```bash
 python /mnt/skills/public/ip-room-effect/scripts/generate.py \
@@ -98,22 +102,25 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
   --output-dir /mnt/user-data/outputs/ip-room/
 ```
 
+脚本内部自行完成物料查询 → 提示词生成 → 效果图生成的全流程，无需手动分步调用 API。
+
 [!NOTE]
-不要读取 Python 脚本内容，直接传入参数调用。
+> 参照「重要规则」章节，严格通过脚本执行，不要读取脚本源码或自行编写内联代码。
 
 ## 参数说明
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
-| `--room-images` | 是 | 房间原图文件路径，多张空格分隔 |
+| `--room-images` | 是* | 房间原图文件路径，多张空格分隔；`--query-materials` 模式下不需要 |
 | `--ip-name` | 是 | IP 名称，如 `ultraman`、`barbie` |
 | `--room-region` | 是 | 房间区域：`suite_living_room`、`suite_bedroom`、`standard_bedroom`、`single_bedroom`、`bathroom` |
 | `--material-types` | 否 | 要添加的物料类型，默认全部 |
 | `--style-note` | 否 | 风格说明文字 |
-| `--output-dir` | 是 | 效果图输出目录 |
+| `--output-dir` | 否 | 效果图输出目录，默认 `./outputs`；`--query-materials` 模式下不使用 |
 | `--max-images` | 否 | 最多生成图片数，默认 4 |
 | `--prompt-only` | 否 | 只生成提示词，不生图 |
 | `--prompt-file` | 否 | 使用已有提示词文件 JSON 直接生图 |
+| `--query-materials` | 否 | 仅查询物料清单，不需要传入房间图像 |
 
 ## 常见场景
 
@@ -127,7 +134,8 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 
 - 效果图保存在 `output_dir` 目录下，文件名为 `ip_room_01.jpg`, `ip_room_02.jpg` 等
 - 同时保存 `prompt.json` 提示词文件，供后续复用或调整
-- 向用户展示生成的效果图并提供简要说明
+- 使用 `present_files` 工具向用户展示生成的效果图
+- 同时展示 `prompt.json` 中的物料放置信息
 - 如效果不满意，可修改 `prompt.json` 后使用 `--prompt-file` 重新生图
 
 ## 注意事项
@@ -137,3 +145,4 @@ python /mnt/skills/public/ip-room-effect/scripts/generate.py \
 - 组图模式保证多角度之间物料颜色、图案的一致性
 - 生成的图片 URL 有效期为 24 小时，脚本会自动下载到本地保存
 - 脚本使用环境变量 `STOCK_API_BASE_URL` 连接后端，默认 `http://localhost:8000`
+- **不要绕过脚本直接调用 API 或写内联代码调试**：如遇错误，将脚本输出原文反馈给用户等待处理，不要自行编写调试代码
