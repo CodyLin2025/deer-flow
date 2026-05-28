@@ -282,7 +282,7 @@ python /mnt/skills/public/stock-quant-trading/scripts/portfolio.py \
 
 ##### B6a: 读取数据源
 
-按顺序用 `read_file` 读取以下文件（每个文件都必须读取，不可跳过）：
+按顺序用 `read_file` 读取以下文件（每个文件都必须读取，不可跳过）。**读取阶段不要输出任何思考性文字或进度提示**，所有文件读完直接开始输出报告。
 
 ```bash
 read_file /mnt/user-data/workspace/screened_meta.json    # 市场状态、基准指标
