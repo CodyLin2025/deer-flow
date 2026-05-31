@@ -1,6 +1,6 @@
 ---
 name: stock-quant-trading
-description: A股/港股量化交易分析技能，支持两大场景 — 场景A: 单股/多股深度分析（实时行情/技术指标/财务/研报/舆情/综合研判六维度），场景B: 全市场量化选股（8因子Alpha模型/多因子筛选/组合优化/风控建议）。所有数据通过 stock-data-crawl API + Python 脚本获取，禁止 web_search/web_fetch。适用场景：个股分析、量化选股、技术分析、买卖信号、持仓建议、行业轮动。
+description: 股票分析、量化选股、个股分析、技术分析、买卖信号、持仓建议、行业轮动。用于A股/港股量化交易，支持个股深度分析（实时行情/技术指标/财务/研报/舆情/综合研判六维度）和全市场量化选股（8因子Alpha模型/多因子筛选/组合优化/风控建议）。所有数据通过 stock-data-crawl API + Python 脚本获取，禁止 web_search/web_fetch。
 allowed-tools:
   - read_file
   - write_file
