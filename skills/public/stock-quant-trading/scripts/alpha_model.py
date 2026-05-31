@@ -162,6 +162,7 @@ class AlphaModel:
 
         dispersion = calc_factor_dispersion(factor_scores)
         signal, confidence = determine_signal(final_alpha, dispersion)
+        original_signal = signal
 
         risk_flags = list(screened.get("risk_flags", []))
         if "PE极端高" in risk_flags or "经营现金流为负" in risk_flags:
@@ -189,6 +190,8 @@ class AlphaModel:
         elif breakdown_count >= 1:
             confidence = max(0, confidence - 10)
 
+        downgraded_from = original_signal if signal != original_signal else None
+
         return {
             "code": code,
             "name": screened.get("name", ""),
@@ -198,6 +201,7 @@ class AlphaModel:
             "alpha_score": round(final_alpha, 2),
             "factor_scores": factor_scores,
             "signal": signal,
+            "downgraded_from": downgraded_from,
             "confidence": round(confidence, 2),
             "risk_flags": risk_flags,
             "breakdown_flags": breakdown_flags,
